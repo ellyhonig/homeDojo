@@ -10,7 +10,8 @@ public class ControllerIndexAssignment : MonoBehaviour
     private person PersonScript;
     private List<int> activeControllerIndices = new List<int>();
     private List<SteamVR_TrackedObject> trackedObjects = new List<SteamVR_TrackedObject>();
-
+    public GameObject conR;
+    public GameObject conL;
     void Start()
     {
         PersonScript = GetComponent<person>();
@@ -131,8 +132,8 @@ public class ControllerIndexAssignment : MonoBehaviour
     // New code ends here
 
     // Assign sorted indices to controllers. This part must also comply with coroutine logic.
-    if (sortedIndices.Count > 0) AssignToController(PersonScript.conR, sortedIndices[0]);
-    if (sortedIndices.Count > 1) AssignToController(PersonScript.conL, sortedIndices[1]);
+    if (sortedIndices.Count > 0) AssignToController(conR, sortedIndices[0]);
+    if (sortedIndices.Count > 1) AssignToController(conL, sortedIndices[1]);
     if (sortedIndices.Count > 2) AssignToController(PersonScript.kneeConR, sortedIndices[2]);
     if (sortedIndices.Count > 3) AssignToController(PersonScript.kneeConL, sortedIndices[3]);
 }

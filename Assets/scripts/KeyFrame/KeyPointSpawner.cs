@@ -27,10 +27,13 @@ public class KeyPointSpawner : MonoBehaviour
     public int playerScore = 0;
     public float proximityThreshold = 0.5f; // Adjust as needed
     public float distanceUnit = 1.0f; // Distance unit to space out keyframes
-
+    private Canvas canvas;
+    public float canvasProximityThreshold = 0.1f;
 void Start()
 {
     recorder = GetComponent<Recorder>();
+    canvas = new GameObject("LetterTraceCanvas").AddComponent<Canvas>();
+    canvas.transform.position = hmd.transform.position + hmd.transform.forward * 0.5f;
     keyFrameList = new List<KeyFrame>();
     if (recorder == null)
     {
@@ -49,8 +52,15 @@ void Update()
     {
         currentUpdate?.Invoke();
         nextUpdateTime = Time.time + updateRate;
+        //if(recorder.currentUpdate.Method.Name == "RecordFrame")
+            UpdateCanvasGlow();
     }
 }
+private void UpdateCanvasGlow()
+        {
+            bool isHandCloseToCanvas = Vector3.Distance(conR.transform.position, canvas.transform.position) <= canvasProximityThreshold;
+            canvas.SetGlow(isHandCloseToCanvas);
+        }
 public void UpdateScoreText()
 {
     if (scoreText != null)
@@ -379,7 +389,25 @@ public class KeyFrame
 }
 }
 
+public class Canvas : MonoBehaviour
+    {
+        private Renderer canvasRenderer;
 
+        private void Awake()
+        {
+            GameObject visualPlane = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            visualPlane.transform.localScale = new Vector3(0.1f, 1f, 0.1f);
+            visualPlane.transform.SetParent(transform, false);
+            canvasRenderer = visualPlane.GetComponent<Renderer>();
+            canvasRenderer.material = new Material(Shader.Find("Standard"));
+        }
+
+        public void SetGlow(bool isGlowing)
+        {
+           if(isGlowing) canvasRenderer.material.color = Color.green;
+           else canvasRenderer.material.color = Color.white; 
+        }
+    }
 
 }
 
@@ -612,4 +640,6 @@ public class TraceChecker
         return isPositionCloseEnough;
     }
 }
+ 
 }
+

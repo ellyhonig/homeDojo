@@ -31,7 +31,7 @@ public class HandProximityActionTrigger : MonoBehaviour
         if (recorder != null && keyPointSpawner != null)
         {
             // Check proximity between the recorded player's hands
-            if (CheckHandProximity(recorder.PlayerToRecord.Chest.shoulderR.hand.bp, recorder.PlayerToRecord.Chest.shoulderL.hand.bp) || CheckHandProximity(recorder.PlayerToRecord.Hip.shoulderR.hand.bp, recorder.PlayerToRecord.Hip.shoulderL.hand.bp))
+            if (CheckHandProximity(recorder.PlayerToRecord.Chest.shoulderR.hand.bp, recorder.PlayerToRecord.Chest.shoulderL.hand.bp) )
             {
                 // Hands are close enough; indicate activation
                 if (visualIndicator != null)

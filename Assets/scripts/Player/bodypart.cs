@@ -486,8 +486,8 @@ public class player
     public void updater()
     {
         Chest.updater();
-        Hip.updater();
-        playerTorso.updater();
+        //Hip.updater();
+       // playerTorso.updater();
         currentUpdate();
     }
    public void HideHipBodyParts()

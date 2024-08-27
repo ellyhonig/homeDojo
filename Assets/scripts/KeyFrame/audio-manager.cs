@@ -5,10 +5,14 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip popSound;
     [SerializeField] private AudioClip winSound;
-    [SerializeField] private LetterTracingSystem tracingSystem;
+    [SerializeField] private AudioClip munchSound;
 
+    [SerializeField] private LetterTracingSystem tracingSystem;
+    [SerializeField] private ObjectOfInterestManager objManager;
     private void Start()
     {
+        objManager = GetComponent<ObjectOfInterestManager>();
+
         if (audioSource == null)
         {
             audioSource = gameObject.AddComponent<AudioSource>();
@@ -23,34 +27,38 @@ public class AudioManager : MonoBehaviour
         {
             tracingSystem.OnKeyframeReached += PlayPopSound;
             tracingSystem.OnTraceCompleted += PlayWinSound;
+            objManager.OnHMDProximity += PlayMunchSound;
+
         }
         else
         {
             Debug.LogError("LetterTracingSystem not found. Please assign it in the inspector or ensure it's on the same GameObject.");
         }
     }
-
-    private void PlayPopSound()
+    private void PlaySound(AudioClip clip)
     {
-        if (audioSource != null && popSound != null)
+       if (audioSource != null && popSound != null)
         {
-            audioSource.PlayOneShot(popSound);
+            audioSource.PlayOneShot(clip);
         }
         else
         {
-            Debug.LogWarning("AudioSource or pop sound is missing. Please assign them in the inspector.");
-        }
+            Debug.LogWarning("AudioSource or clip sound is missing. Please assign them in the inspector.");
+        } 
+    }
+    private void PlayPopSound()
+    {
+        PlaySound(popSound);
     }
     private void PlayWinSound()
     {
-        if (audioSource != null && winSound != null)
-        {
-            audioSource.PlayOneShot(winSound);
-        }
-        else
-        {
-            Debug.LogWarning("AudioSource or winSound sound is missing. Please assign them in the inspector.");
-        }
+        PlaySound(winSound);
+
+    }
+    private void PlayMunchSound()
+    {
+        PlaySound(munchSound);
+
     }
     private void OnDisable()
     {

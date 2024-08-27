@@ -15,16 +15,16 @@ public class CanvasManager : MonoBehaviour
     [SerializeField, Range(0, 31)] private int visualizationLayer = 0;
     [SerializeField] private int initialPoolSize = 2000;
 
-    private List<GameObject> activeSpheres = new List<GameObject>();
     private Queue<GameObject> spherePool = new Queue<GameObject>();
+    public List<GameObject> activeSpheres = new List<GameObject>();
     private Renderer canvasRenderer;
     private Plane canvasPlaneGeometry;
     private bool isInitialized = false;
     private bool isRecording = false;
     private bool isHandConstrained = false;
     private int hmdSide = 1; // 1 for positive side, -1 for negative side
-
-    private void Start()
+    private GameObject visualizationParent;
+    public float pointDistance = 0.1f;    private void Start()
     {
         Initialize();
     }
@@ -40,12 +40,83 @@ public class CanvasManager : MonoBehaviour
         canvasRenderer = canvasPlane.GetComponent<Renderer>();
         canvasPlaneGeometry = new Plane(canvasPlane.transform.up, canvasPlane.transform.position);
         
-        recorder.OnRecordingStarted += StartProcessing;
-        recorder.OnRecordingStopped += StopProcessing;
+        if (recorder != null)
+        {
+            recorder.OnRecordingStarted += StartProcessing;
+            recorder.OnRecordingStopped += StopProcessing;
+            recorder.OnRecordingStopped += currentRecordProcessor; // Subscribe to the event
+            recorder.OnRecordingLoaded += CreateVisualizationForAllPoints;
+        }
+        else
+        {
+            Debug.LogError("SimpleRecorder reference is missing in CanvasManager.");
+        }
 
+        CreateVisualizationParent();
         InitializeSpherePool();
 
         isInitialized = true;
+    }
+     private void currentRecordProcessor()
+    {
+        if (recorder == null || recorder.currentRecord == null)
+        {
+            Debug.LogError("Recorder or currentRecord is null");
+            return;
+        }
+
+        List<GameObject> spheresToKeep = new List<GameObject>();
+        List<GameObject> spheresToRemove = new List<GameObject>();
+
+        // Always keep the first sphere
+        if (activeSpheres.Count > 0)
+        {
+            spheresToKeep.Add(activeSpheres[0]);
+        }
+
+        // Filter spheres based on the minimum distance
+        for (int i = 1; i < activeSpheres.Count; i++)
+        {
+            Vector3 lastKeptPosition = spheresToKeep[spheresToKeep.Count - 1].transform.position;
+            Vector3 currentPosition = activeSpheres[i].transform.position;
+
+            if (Vector3.Distance(lastKeptPosition, currentPosition) >= pointDistance)
+            {
+                spheresToKeep.Add(activeSpheres[i]);
+            }
+            else
+            {
+                spheresToRemove.Add(activeSpheres[i]);
+            }
+        }
+
+        // Remove spheres that are too close
+        foreach (GameObject sphere in spheresToRemove)
+        {
+            activeSpheres.Remove(sphere);
+            Destroy(sphere);
+        }
+
+        // Clear the existing frames in currentRecord
+        recorder.currentRecord.frames.Clear();
+
+        // Add new frames based on the positions of kept spheres
+        foreach (GameObject sphere in spheresToKeep)
+        {
+            SimpleFrame newFrame = new SimpleFrame(sphere.transform.position);
+            recorder.currentRecord.frames.Add(newFrame);
+        }
+
+        Debug.Log($"CurrentRecord processed. New frame count: {recorder.currentRecord.frames.Count}");
+        Debug.Log($"Kept spheres: {spheresToKeep.Count}, Removed spheres: {spheresToRemove.Count}");
+    }
+
+    private void CreateVisualizationParent()
+    {
+        visualizationParent = new GameObject("VisualizationParent");
+        visualizationParent.transform.SetParent(transform.parent); // Set parent to the same parent as CanvasManager
+        visualizationParent.transform.localPosition = Vector3.zero;
+        visualizationParent.transform.localRotation = Quaternion.identity;
     }
 
     private void InitializeSpherePool()
@@ -57,25 +128,34 @@ public class CanvasManager : MonoBehaviour
             spherePool.Enqueue(sphere);
         }
     }
-
+    
     private GameObject CreateSphere(int index)
     {
         GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         sphere.name = $"keypoint_{index}";
-        sphere.transform.localScale = Vector3.one * (sphereRadius * 2);
+        sphere.transform.localScale = Vector3.one * (sphereRadius * 5);
         sphere.GetComponent<Renderer>().material.color = sphereColor;
         sphere.layer = visualizationLayer;
         Destroy(sphere.GetComponent<Collider>());
+        sphere.transform.SetParent(visualizationParent.transform);
         return sphere;
     }
+    private float updateRate = 0.01f; // Run 100x per second
+    private float nextUpdateTime = 0f;
 
     private void Update()
     {
-        if (!isInitialized || !isRecording) return;
+        if (Time.time >= nextUpdateTime)
+        {
+            
+            if (!isInitialized || !isRecording) return;
 
-        UpdateHmdSide();
-        CheckHandProximity();
-        UpdateCanvasColor();
+            UpdateHmdSide();
+            CheckHandProximity();
+            UpdateCanvasColor();
+            nextUpdateTime = Time.time + updateRate;
+            
+        }
     }
 
     private void UpdateHmdSide()
@@ -145,13 +225,25 @@ public class CanvasManager : MonoBehaviour
         UpdateCanvasColor();
     }
 
+      public void CreateVisualizationForAllPoints()
+    {
+        ClearVisualization();
+
+        if (recorder.currentRecord != null && recorder.currentRecord.frames != null)
+        {
+            foreach (var frame in recorder.currentRecord.frames)
+            {
+                CreateVisualizationSphere(frame.position);
+            }
+        }
+    }
+
     private void CreateVisualizationSphere(Vector3 position)
     {
         GameObject sphere;
         if (spherePool.Count > 0)
         {
             sphere = spherePool.Dequeue();
-            sphere.SetActive(true);
         }
         else
         {
@@ -159,6 +251,7 @@ public class CanvasManager : MonoBehaviour
         }
 
         sphere.transform.position = position;
+        sphere.SetActive(true);
         activeSpheres.Add(sphere);
     }
 
@@ -172,12 +265,22 @@ public class CanvasManager : MonoBehaviour
         activeSpheres.Clear();
     }
 
-    private void OnDisable()
+     private void OnDisable()
     {
         if (recorder != null)
         {
             recorder.OnRecordingStarted -= StartProcessing;
             recorder.OnRecordingStopped -= StopProcessing;
+            recorder.OnRecordingStopped -= currentRecordProcessor; // Unsubscribe from the event
+            recorder.OnRecordingLoaded -= CreateVisualizationForAllPoints;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (visualizationParent != null)
+        {
+            Destroy(visualizationParent);
         }
     }
 }

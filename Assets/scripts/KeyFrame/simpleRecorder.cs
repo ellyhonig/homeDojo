@@ -1,17 +1,15 @@
 using UnityEngine;
 using System;
 using System.Collections.Generic;
-using System.IO;
-using Newtonsoft.Json;
 
 public class SimpleRecorder : MonoBehaviour
 {
     public simplePlayer playerToRecord;
-    private string saveFilePath;
     public SimpleRecord currentRecord;
     
     public event Action OnRecordingStarted;
     public event Action OnRecordingStopped;
+    public event Action OnRecordingLoaded;
 
     [SerializeField] private bool _isRecording = false;
     public bool IsRecording
@@ -31,35 +29,45 @@ public class SimpleRecorder : MonoBehaviour
         }
     }
 
-    private float recordingInterval = 0.3f;
+    [SerializeField] private GameObject pointPrefab;
+    [SerializeField] private Transform pointParent;
+
+    private float recordingInterval = 400f;
     private float timer = 0f;
+    private SaveManager saveManager;
 
     private void Start()
     {
         playerToRecord = GetComponent<simplePlayer>();
-        saveFilePath = Path.Combine(Application.persistentDataPath, "simple_recording.json");
         currentRecord = new SimpleRecord();
+        saveManager = GetComponent<SaveManager>();
+        if (saveManager == null)
+        {
+            saveManager = gameObject.AddComponent<SaveManager>();
+        }
         Debug.Log("SimpleRecorder started.");
     }
-    private float updateRate = 0.01f; // Run 100x per second
+
+    private float updateRate = 0.1f; // Run 100x per second
     private float nextUpdateTime = 0f;
+
     private void Update()
     {
         if (Time.time >= nextUpdateTime)
         {
-         if (_isRecording)
-          {
-            timer += Time.deltaTime;
-            if (timer >= recordingInterval)
+            if (_isRecording)
             {
-                RecordFrame();
-                timer = 0f;
+                timer += Time.deltaTime;
+                if (timer >= recordingInterval)
+                {
+                    RecordFrame();
+                    timer = 0f;
+                }
             }
-          }
-        
-        nextUpdateTime = Time.time + updateRate;
-         }
+            nextUpdateTime = Time.time + updateRate;
+        }
     }
+
     private void StartRecording()
     {
         currentRecord = new SimpleRecord();
@@ -80,36 +88,33 @@ public class SimpleRecorder : MonoBehaviour
         currentRecord.frames.Add(frame);
     }
 
-    // This method is called when the script is loaded or a value is changed in the Inspector.
-    private void OnValidate()
-    {
-        // Ensure that changes made in the inspector trigger the appropriate methods
-        if (Application.isPlaying)
-        {
-            IsRecording = _isRecording;
-        }
-    }
+    
 
     public void SaveRecording()
     {
-        string json = JsonConvert.SerializeObject(currentRecord, Formatting.Indented);
-        File.WriteAllText(saveFilePath, json);
-        Debug.Log($"Recording saved to {saveFilePath}");
+        saveManager.SaveRecording(currentRecord);
+        
     }
 
     public void LoadRecording()
     {
-        if (File.Exists(saveFilePath))
+        SimpleRecord loadedRecord = saveManager.LoadRecording();
+        if (loadedRecord != null)
         {
-            string json = File.ReadAllText(saveFilePath);
-            currentRecord = JsonConvert.DeserializeObject<SimpleRecord>(json);
-            Debug.Log($"Recording loaded from {saveFilePath}");
+            currentRecord = loadedRecord;
+            OnRecordingLoaded?.Invoke();
+            
         }
-        else
-        {
-            Debug.LogWarning("No saved recording found.");
-        }
+
     }
+
+    
+}
+
+[System.Serializable]
+public class SimpleRecord
+{
+    public List<SimpleFrame> frames = new List<SimpleFrame>();
 }
 
 [System.Serializable]
@@ -121,10 +126,4 @@ public class SimpleFrame
     {
         position = pos;
     }
-}
-
-[System.Serializable]
-public class SimpleRecord
-{
-    public List<SimpleFrame> frames = new List<SimpleFrame>();
 }

@@ -1,5 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
+using System;
+
 
 public class CanvasManager : MonoBehaviour
 {
@@ -24,7 +26,15 @@ public class CanvasManager : MonoBehaviour
     private bool isHandConstrained = false;
     private int hmdSide = 1; // 1 for positive side, -1 for negative side
     private GameObject visualizationParent;
-    public float pointDistance = 0.1f;    private void Start()
+    private GameObject canvasParent;
+    public float pointDistance = 0.1f;   
+    public float distanceFromHMD = 0.5f;
+    public Vector3 offsetFromHMD = new Vector3(0f, -0.2f, 0f);
+    public float additionalRotationAngle = 116; // Adjust this value to rotate more or less
+
+    public event Action OnCanvasRepositioned;
+
+     private void Start()
     {
         Initialize();
     }
@@ -54,7 +64,7 @@ public class CanvasManager : MonoBehaviour
 
         CreateVisualizationParent();
         InitializeSpherePool();
-
+        canvasParent = new GameObject("CanvasParent");
         isInitialized = true;
     }
      private void currentRecordProcessor()
@@ -113,10 +123,10 @@ public class CanvasManager : MonoBehaviour
 
     private void CreateVisualizationParent()
     {
-        visualizationParent = new GameObject("VisualizationParent");
-        visualizationParent.transform.SetParent(transform.parent); // Set parent to the same parent as CanvasManager
-        visualizationParent.transform.localPosition = Vector3.zero;
-        visualizationParent.transform.localRotation = Quaternion.identity;
+        visualizationParent = canvasPlane;
+        //visualizationParent.transform.SetParent(transform.parent); // Set parent to the same parent as CanvasManager
+        //visualizationParent.transform.localPosition = Vector3.zero;
+        //visualizationParent.transform.localRotation = Quaternion.identity;
     }
 
     private void InitializeSpherePool()
@@ -154,8 +164,9 @@ public class CanvasManager : MonoBehaviour
             CheckHandProximity();
             UpdateCanvasColor();
             nextUpdateTime = Time.time + updateRate;
-            
+           
         }
+         Debug.Log("kiii");
     }
 
     private void UpdateHmdSide()
@@ -264,7 +275,109 @@ public class CanvasManager : MonoBehaviour
         }
         activeSpheres.Clear();
     }
+     public void UpdateCanvas()
+    {
+        
+        if (recorder.currentRecord.frames.Count > 0)
+        {
+            PositionCanvasWithRecordedPoints();
+        }
+        else
+        {
+            PositionCanvasWithoutPoints();
+        }
+    }
 
+    private void PositionCanvasWithRecordedPoints()
+    {
+        if (recorder.playerToRecord == null || recorder.playerToRecord.hmd == null)
+        {
+            Debug.LogError("Player or HMD reference is missing!");
+            return;
+        }
+
+        Transform hmdTransform = recorder.playerToRecord.hmd.transform;
+
+        // Set canvasParent position to the first recorded point
+        canvasParent.transform.position = recorder.currentRecord.frames[0].position;
+
+        // Parent the canvasPlane to canvasParent
+        canvasPlane.transform.SetParent(canvasParent.transform, true);
+
+        // Position the parent based on HMD forward direction
+        Vector3 hmdForward = hmdTransform.forward;
+        Vector3 forwardProjected = Vector3.ProjectOnPlane(hmdForward, Vector3.up).normalized;
+        Vector3 newPosition = hmdTransform.position + forwardProjected * distanceFromHMD;
+        newPosition.y = hmdTransform.position.y;
+        newPosition += offsetFromHMD;
+        canvasParent.transform.position = newPosition;
+
+        // Rotate the parent so its red arrow (forward) is parallel and opposite to HMD forward projected on XZ
+        // Then apply additional rotation
+        Quaternion baseRotation = Quaternion.LookRotation(-forwardProjected, Vector3.up);
+        Quaternion additionalRotation = Quaternion.Euler(0, additionalRotationAngle, 0);
+        canvasParent.transform.rotation = baseRotation * additionalRotation;
+
+        // Update recorded positions
+        UpdateRecordedPositions();
+
+        // Unparent the canvasPlane
+        canvasPlane.transform.SetParent(null);
+        OnCanvasRepositioned?.Invoke();
+        Debug.Log($"Canvas positioned at {canvasParent.transform.position} and rotated based on HMD with additional rotation");
+    }
+
+    private void PositionCanvasWithoutPoints()
+    {
+        if (recorder.playerToRecord != null && recorder.playerToRecord.hmd != null)
+        {
+            Transform hmdTransform = recorder.playerToRecord.hmd.transform;
+            Vector3 hmdForward = hmdTransform.forward;
+            Vector3 forwardProjected = Vector3.ProjectOnPlane(hmdForward, Vector3.up).normalized;
+            
+            Vector3 newPosition = hmdTransform.position + forwardProjected * distanceFromHMD;
+            newPosition.y = hmdTransform.position.y;
+            newPosition += offsetFromHMD;
+            
+            canvasPlane.transform.position = newPosition;
+
+            Quaternion baseRotation = Quaternion.LookRotation(-forwardProjected, Vector3.up);
+            Quaternion additionalRotation = Quaternion.Euler(0, additionalRotationAngle, 0);
+            canvasPlane.transform.rotation = baseRotation * additionalRotation;
+
+            Debug.Log($"Canvas positioned at {canvasPlane.transform.position} without recorded points");
+        }
+    }
+
+    private void UpdateRecordedPositions()
+    {
+        if (activeSpheres.Count != recorder.currentRecord.frames.Count)
+        {
+            Debug.LogError("Mismatch between number of active spheres and recorded frames!");
+            return;
+        }
+
+        for (int i = 0; i < recorder.currentRecord.frames.Count; i++)
+        {
+            if (activeSpheres[i] != null)
+            {
+                SimpleFrame frame = recorder.currentRecord.frames[i];
+                frame.position = activeSpheres[i].transform.position;
+                recorder.currentRecord.frames[i] = frame;
+            }
+            else
+            {
+                Debug.LogWarning($"Active sphere at index {i} is null!");
+            }
+        }
+
+        Debug.Log($"Updated {recorder.currentRecord.frames.Count} frame positions based on sphere positions.");
+    }
+
+    public void UpdateActiveSpheres(List<GameObject> spheres)
+    {
+        activeSpheres = spheres;
+    }
      private void OnDisable()
     {
         if (recorder != null)
@@ -283,4 +396,5 @@ public class CanvasManager : MonoBehaviour
             Destroy(visualizationParent);
         }
     }
+    
 }

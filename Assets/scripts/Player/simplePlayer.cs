@@ -16,11 +16,11 @@ public class simplePlayer : MonoBehaviour
     void Start()
     {
         lefthand = GameObject.CreatePrimitive(PrimitiveType.Sphere); // Create a sphere to represent the body part
-        lefthand.transform.localScale = new Vector3(.1f, .1f, .1f); // Set the scale of the sphere
+        lefthand.transform.localScale = new Vector3(0.06f,0.06f,0.06f); // Set the scale of the sphere
         lefthand.name = "lefthand"; // Set the name of the GameObject
         
         righthand = GameObject.CreatePrimitive(PrimitiveType.Sphere); // Create a sphere to represent the body part
-        righthand.transform.localScale = new Vector3(.1f, .1f, .1f); // Set the scale of the sphere
+        righthand.transform.localScale = new Vector3(0.06f,0.06f,0.06f); // Set the scale of the sphere
         righthand.name = "righthand"; // Set the name of the GameObject
         currentUpdate = regularUpdate;
         

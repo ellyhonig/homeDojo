@@ -32,6 +32,7 @@ public class ObjectOfInterestManager : MonoBehaviour
     public event Action OnObjectCollected;
 
     private LetterTracingSystem letterTracingSystem;
+    private CanvasManager canvasManager;
     private SimpleRecorder recorder;
     private Vector3 initialPosition;
     private ObjectState currentState = ObjectState.Opaque;
@@ -42,6 +43,7 @@ public class ObjectOfInterestManager : MonoBehaviour
 
     private void Start()
     {
+        canvasManager = GetComponent<CanvasManager>();
         letterTracingSystem = GetComponent<LetterTracingSystem>();
         recorder = GetComponent<SimpleRecorder>();
 
@@ -53,6 +55,7 @@ public class ObjectOfInterestManager : MonoBehaviour
 
         letterTracingSystem.OnTraceCompleted += OnTraceCompleted;
         recorder.OnRecordingLoaded += SetInitialPosition;
+        canvasManager.OnCanvasRepositioned += SetInitialPosition;
 
         if (objectOfInterest == null)
         {
@@ -99,18 +102,44 @@ public class ObjectOfInterestManager : MonoBehaviour
 
     private void SetInitialPosition()
     {
-        if (recorder.currentRecord.frames.Count > 0)
+        if (canvasManager == null)
         {
-            Vector3 lastPosition = recorder.currentRecord.frames[recorder.currentRecord.frames.Count - 1].position;
-            initialPosition = lastPosition - Vector3.up * 0.1f;
-            objectOfInterest.transform.position = initialPosition;
+            Debug.LogError("CanvasManager is null!");
+            return;
+        }
+
+        var spheres = canvasManager.activeSpheres;
+
+        if (spheres != null && spheres.Count > 0)
+        {
+            GameObject lastSphere = spheres[letterTracingSystem.lastLetterKeyframeIndex];
+            if (lastSphere != null)
+            {
+                Vector3 lastPosition = lastSphere.transform.position;
+                initialPosition = lastPosition - Vector3.up * 0.1f;
+                objectOfInterest.transform.position = initialPosition;
+                Debug.Log($"Set initial position based on last sphere: {initialPosition}");
+            }
+            else
+            {
+                SetDefaultPosition();
+            }
         }
         else
         {
-            Debug.LogWarning("No recorded frames found. Using current position.");
-            initialPosition = objectOfInterest.transform.position;
+            SetDefaultPosition();
         }
     }
+
+    private void SetDefaultPosition()
+    {
+        Debug.LogWarning("No spheres found or last sphere is null. Using current position.");
+        initialPosition = objectOfInterest.transform.position;
+    }
+
+    
+    // Method to be called when spheres are updated
+    
 
    private void SetState(ObjectState newState)
     {

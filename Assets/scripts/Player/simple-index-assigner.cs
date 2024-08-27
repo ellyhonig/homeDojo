@@ -10,7 +10,7 @@ public class SimpleIndexAssigner : MonoBehaviour
     private List<int> activeControllerIndices = new List<int>();
     private List<SteamVR_TrackedObject> trackedObjects = new List<SteamVR_TrackedObject>();
     private bool conRAssigned = false;
-    private float searchInterval = 0.05f; // Reduced from 0.1f for faster updates
+    private float searchInterval = 0.05f;
 
     void Start()
     {
@@ -27,10 +27,7 @@ public class SimpleIndexAssigner : MonoBehaviour
 
     private IEnumerator AssignActiveIndices()
     {
-        float startTime = Time.time;
-        float totalSearchTime = 20f; // Total search time increased to 20 seconds
-
-        while (Time.time - startTime < totalSearchTime && (!conRAssigned || Time.time - startTime < 10f))
+        while (!conRAssigned)
         {
             yield return StartCoroutine(SearchForControllers());
             yield return StartCoroutine(PickIndices());
@@ -38,6 +35,11 @@ public class SimpleIndexAssigner : MonoBehaviour
             if (conRAssigned && player.righthand != null)
             {
                 player.righthand.GetComponent<Renderer>().material.color = Color.red;
+                Debug.Log("Right controller (conR) has been assigned.");
+            }
+            else
+            {
+                Debug.Log("Continuing search for right controller (conR)...");
             }
 
             yield return new WaitForSeconds(searchInterval);
@@ -99,7 +101,7 @@ public class SimpleIndexAssigner : MonoBehaviour
             Vector3 controllerToHmd = kvp.Value - hmdPosition;
             float rightness = Vector3.Dot(controllerToHmd, hmdRight);
             float forwardness = Vector3.Dot(controllerToHmd, hmdForward);
-            return rightness + forwardness * 0.5f;  // Prioritize rightness over forwardness
+            return rightness + forwardness * 0.5f;
         }).Select(kvp => kvp.Key).ToList();
 
         if (sortedIndices.Count > 0 && !conRAssigned)
@@ -108,7 +110,7 @@ public class SimpleIndexAssigner : MonoBehaviour
             conRAssigned = true;
         }
 
-        if (sortedIndices.Count > 1)
+        if (sortedIndices.Count > 1 && conRAssigned)
         {
             AssignToController(player.conL, sortedIndices[1]);
         }

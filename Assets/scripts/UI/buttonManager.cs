@@ -9,33 +9,51 @@ public class ButtonManager : MonoBehaviour
     [SerializeField] private Vector2 gridSize = new Vector2(3, 3);
     [SerializeField] private Vector2 spacing = new Vector2(0.01f, 0.01f);
     [SerializeField] private SimpleRecorder recorder;
+    [SerializeField] private CanvasManager canvasManager;
     [SerializeField] private LetterTracingSystem tracingSystem;
     [SerializeField] private float distanceFromHMD = 0.5f;
     [SerializeField] private Vector3 offsetFromHMD = new Vector3(0f, -0.2f, 0f); // Offset downwards slightly
 
     private Dictionary<string, System.Action> buttonActions;
     private GameObject buttonParent;
-
+    public bool hideDevButtons = false;
 
     void Start()
     {
+        canvasManager = GetComponent<CanvasManager>();
         InitializeButtonActions();
         CreateButtonGrid();
         UpdateButtonParentPosition();
+        
     }
 
     private void InitializeButtonActions()
+{
+    if(!hideDevButtons)
     {
         buttonActions = new Dictionary<string, System.Action>
         {
             {"Start Recording", () => recorder.IsRecording = true},
             {"Stop Recording", () => recorder.IsRecording = false},
             {"Save Recording", recorder.SaveRecording},
+            {"Reposition Canvas", canvasManager.UpdateCanvas},
             {"Load Recording", recorder.LoadRecording},
             {"Start Tracing", tracingSystem.StartTracing},
             {"Clear", ClearRecording}
         };
     }
+    else
+    {
+        buttonActions = new Dictionary<string, System.Action>
+        {
+            {"Reposition Letters", () => canvasManager.UpdateCanvas()},
+            {"Start", () => {
+                recorder.LoadRecording();
+                tracingSystem.StartTracing();
+            }}
+        };
+    }
+}
 
     private void CreateButtonGrid()
     {
@@ -105,6 +123,7 @@ public class ButtonManager : MonoBehaviour
         if(isLookingUp())
         {
            UpdateButtonParentPosition();  
+           
         }
     }
 

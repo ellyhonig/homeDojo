@@ -36,17 +36,27 @@ public class SimpleRecorder : MonoBehaviour
     private float timer = 0f;
     private SaveManager saveManager;
 
-    private void Start()
+    void Start()
     {
         playerToRecord = GetComponent<simplePlayer>();
         currentRecord = new SimpleRecord();
+        Debug.Log("SimpleRecorder started.");
+        LoadRecording();
+    }
+    void Awake()
+    {
+        InitializeSaveManager();
+    }
+    private void InitializeSaveManager()
+    {
         saveManager = GetComponent<SaveManager>();
         if (saveManager == null)
         {
+            Debug.Log("SaveManager not found. Adding a new one.");
             saveManager = gameObject.AddComponent<SaveManager>();
         }
-        Debug.Log("SimpleRecorder started.");
     }
+
 
     private float updateRate = 0.1f; // Run 100x per second
     private float nextUpdateTime = 0f;
@@ -98,14 +108,34 @@ public class SimpleRecorder : MonoBehaviour
 
     public void LoadRecording()
     {
-        SimpleRecord loadedRecord = saveManager.LoadRecording();
-        if (loadedRecord != null)
+        if (saveManager == null)
         {
-            currentRecord = loadedRecord;
-            OnRecordingLoaded?.Invoke();
-            
+            Debug.LogError("SaveManager is null. Initializing SaveManager.");
+            InitializeSaveManager();
         }
 
+        try
+        {
+            SimpleRecord loadedRecord = saveManager.LoadRecording();
+            if (loadedRecord != null && loadedRecord.frames != null && loadedRecord.frames.Count > 0)
+            {
+                currentRecord = loadedRecord;
+                OnRecordingLoaded?.Invoke();
+                Debug.Log($"Recording loaded successfully. Frame count: {currentRecord.frames.Count}");
+            }
+            else
+            {
+                Debug.LogWarning("Loaded record is null or empty. Creating a new empty record.");
+                currentRecord = new SimpleRecord();
+                OnRecordingLoaded?.Invoke();
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"Error loading recording: {e.Message}\n{e.StackTrace}");
+            currentRecord = new SimpleRecord();
+            OnRecordingLoaded?.Invoke();
+        }
     }
 
     

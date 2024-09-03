@@ -82,7 +82,7 @@ public class ObjectOfInterestManager : MonoBehaviour
         containerObject = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         containerObject.transform.localScale = Vector3.one;
         containerObject.name = "ContainerObject";
-        containerObject.transform.position = new Vector3(1f, 1f, 1f); // Set a default position
+        containerObject.transform.position = recorder.playerToRecord.hmd.transform.position + Vector3.forward; // Set a default position
     }
 
     private void CreateDefaultObject()
@@ -112,13 +112,14 @@ public class ObjectOfInterestManager : MonoBehaviour
 
         if (spheres != null && spheres.Count > 0)
         {
-            GameObject lastSphere = spheres[letterTracingSystem.lastLetterKeyframeIndex];
+            int lastIndex = Mathf.Min(letterTracingSystem.lastLetterKeyframeIndex, spheres.Count - 1);
+            GameObject lastSphere = spheres[spheres.Count  -1];
             if (lastSphere != null)
             {
                 Vector3 lastPosition = lastSphere.transform.position;
                 initialPosition = lastPosition - Vector3.up * 0.1f;
                 objectOfInterest.transform.position = initialPosition;
-                Debug.Log($"Set initial position based on last sphere: {initialPosition}");
+                Debug.Log($"Set initial position based on sphere at index {lastIndex}: {initialPosition}");
             }
             else
             {
@@ -133,7 +134,7 @@ public class ObjectOfInterestManager : MonoBehaviour
 
     private void SetDefaultPosition()
     {
-        Debug.LogWarning("No spheres found or last sphere is null. Using current position.");
+        Debug.LogWarning("No spheres found or last sphere is null. Using current position as default.");
         initialPosition = objectOfInterest.transform.position;
     }
 
@@ -239,7 +240,7 @@ public class ObjectOfInterestManager : MonoBehaviour
     {
         SetState(ObjectState.Collected);
         OnObjectCollected?.Invoke();
-        objectOfInterest.SetActive(false);
+        ResetToInitialPosition();   
     }
     private void CheckProximity()
     {

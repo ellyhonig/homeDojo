@@ -41,9 +41,9 @@ public class ButtonManager : MonoBehaviour
             {"Reposition Canvas", canvasManager.UpdateCanvas},
             {"Load Recording", ()=> recorder.LoadRecording(levelManager.currentLevel)},
             {"Start Tracing", tracingSystem.StartTracing},
-            {"Next Level", () => levelManager.currentLevel++},
+            {"Next Level", () => levelManager.SetLevel(levelManager.currentLevel+1)},
             {"Start All", levelManager.Restart},
-            {"Previous Level", () => {if(levelManager.currentLevel > 0)levelManager.currentLevel--;}},
+            {"Previous Level", () => {if(levelManager.currentLevel > 0)levelManager.SetLevel(levelManager.currentLevel-1);}},
             {"Clear", canvasManager.ClearVisualization}
         };
     }

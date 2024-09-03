@@ -27,7 +27,7 @@ public class SimpleMicVolumeChecker : MonoBehaviour
         }
     }
 
-    private IEnumerator MicrophoneCheck()
+    public IEnumerator MicrophoneCheck()
     {
         microphoneClip = Microphone.Start(selectedMicrophone, true, 1, AudioSettings.outputSampleRate);
         yield return new WaitForSeconds(0.1f); // Wait for microphone to initialize

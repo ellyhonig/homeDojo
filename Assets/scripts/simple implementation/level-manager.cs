@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using System.IO;
 
 public class LevelManager : MonoBehaviour
 {
@@ -11,14 +12,42 @@ public class LevelManager : MonoBehaviour
     }
 
     public GameMode currentMode { get; set; }
-    public int currentLevel { get; set; }
 
+    private int _currentLevel;
+    public int currentLevel
+    {
+        get => _currentLevel;
+        set
+        {
+            if (LevelExists(value))
+            {
+                _currentLevel = value;
+            }
+            else
+            {
+                Debug.LogWarning($"Attempted to set currentLevel to {value}, but this level does not exist.");
+            }
+        }
+    }
+    public void SetLevel(int level)
+    {
+        if (LevelExists(level))
+        {
+            currentLevel = level;
+            LoadLevel(currentLevel);
+        }
+        else
+        {
+            Debug.LogWarning($"Attempted to set level to {level}, but it does not exist.");
+        }
+    }
     public event Action OnVolumeCheckStart;
 
     [SerializeField] private SimpleRecorder recorder;
     [SerializeField] private LetterTracingSystem tracingSystem;
     [SerializeField] private ObjectOfInterestManager objectManager;
     [SerializeField] private SimpleMicVolumeChecker volumeChecker;
+    private SaveManager saveManager;
 
     private void Start()
     {
@@ -26,7 +55,7 @@ public class LevelManager : MonoBehaviour
         if (tracingSystem == null) tracingSystem = GetComponent<LetterTracingSystem>();
         if (objectManager == null) objectManager = GetComponent<ObjectOfInterestManager>();
         if (volumeChecker == null) volumeChecker = GetComponent<SimpleMicVolumeChecker>();
-
+        saveManager = GetComponent<SaveManager>();
         volumeChecker.onVoiceDetected.AddListener(OnVoiceDetected);
         tracingSystem.OnTraceCompleted += OnTraceCompleted;
         objectManager.OnObjectCollected += OnObjectCollected;
@@ -40,7 +69,11 @@ public class LevelManager : MonoBehaviour
         LoadLevel(currentLevel);
         SetGameMode(GameMode.VolumeChecking);
     }
-
+    private bool LevelExists(int level)
+    {
+        string filePath = Path.Combine(Application.persistentDataPath, $"simple_recording{level}.json");
+        return File.Exists(filePath);
+    }
     private void SetGameMode(GameMode newMode)
     {
         currentMode = newMode;
@@ -49,13 +82,22 @@ public class LevelManager : MonoBehaviour
         if (currentMode == GameMode.VolumeChecking)
         {
             OnVolumeCheckStart?.Invoke();
+            StartCoroutine(volumeChecker.MicrophoneCheck());
         }
     }
 
     private void LoadLevel(int level)
     {
-        currentLevel = level;
-        recorder.LoadRecording(currentLevel);
+        if (LevelExists(level))
+        {
+            currentLevel = level;
+            recorder.LoadRecording(currentLevel);
+        }
+        else
+        {
+            Debug.LogWarning($"Attempted to set level to {level}, but it does not exist.");
+        }
+        
     }
 
     private void UpdateComponentStates()

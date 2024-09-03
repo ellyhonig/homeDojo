@@ -122,7 +122,7 @@ public class SimpleRecorder : MonoBehaviour
             if (loadedRecord != null && loadedRecord.frames != null && loadedRecord.frames.Count > 0)
             {
                 currentRecord = loadedRecord;
-                ApplyCanvasTransform(loadedRecord.canvasTransform);
+                loadedRecord.canvasTransform.ApplyTo(canvasManager.canvasPlane.transform);
                 OnRecordingLoaded?.Invoke();
                 Debug.Log($"Level {level} loaded successfully. Frame count: {currentRecord.frames.Count}");
             }

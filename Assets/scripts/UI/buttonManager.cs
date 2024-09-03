@@ -11,9 +11,10 @@ public class ButtonManager : MonoBehaviour
     [SerializeField] private SimpleRecorder recorder;
     [SerializeField] private CanvasManager canvasManager;
     [SerializeField] private LetterTracingSystem tracingSystem;
+    [SerializeField] private LevelManager levelManager;
     [SerializeField] private float distanceFromHMD = 0.5f;
-    [SerializeField] private Vector3 offsetFromHMD = new Vector3(0f, -0.2f, 0f); // Offset downwards slightly
-
+    [SerializeField] private Vector3 offsetFromHMD = new Vector3(1f, -0.2f, 1f); // Offset downwards slightly
+    private bool loaded = false;
     private Dictionary<string, System.Action> buttonActions;
     private GameObject buttonParent;
     public bool hideDevButtons = false;
@@ -21,6 +22,7 @@ public class ButtonManager : MonoBehaviour
     void Start()
     {
         canvasManager = GetComponent<CanvasManager>();
+        levelManager = GetComponent<LevelManager>();
         InitializeButtonActions();
         CreateButtonGrid();
         UpdateButtonParentPosition();
@@ -35,11 +37,14 @@ public class ButtonManager : MonoBehaviour
         {
             {"Start Recording", () => recorder.IsRecording = true},
             {"Stop Recording", () => recorder.IsRecording = false},
-            {"Save Recording", recorder.SaveRecording},
+            {"Save Recording",()=> recorder.SaveRecording(levelManager.currentLevel)},
             {"Reposition Canvas", canvasManager.UpdateCanvas},
-            {"Load Recording", recorder.LoadRecording},
+            {"Load Recording", ()=> recorder.LoadRecording(levelManager.currentLevel)},
             {"Start Tracing", tracingSystem.StartTracing},
-            {"Clear", ClearRecording}
+            {"Next Level", () => levelManager.currentLevel++},
+            {"Start All", levelManager.Restart},
+            {"Previous Level", () => {if(levelManager.currentLevel > 0)levelManager.currentLevel--;}},
+            {"Clear", canvasManager.ClearVisualization}
         };
     }
     else
@@ -122,7 +127,16 @@ public class ButtonManager : MonoBehaviour
     {
         if(isLookingUp())
         {
-           UpdateButtonParentPosition();  
+           UpdateButtonParentPosition();
+           canvasManager.UpdateCanvas();  
+           if(hideDevButtons)
+           {
+                if(!loaded){recorder.LoadRecording(); loaded = true;tracingSystem.StartTracing();  }
+                  
+           }
+           else{
+            canvasManager.UpdateCanvas();
+           }
            
         }
     }

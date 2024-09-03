@@ -17,7 +17,7 @@ public class LetterTracingSystem : MonoBehaviour
     public event Action OnKeyframeReached;
     public event Action OnTraceCompleted;
 
-    [SerializeField] private SimpleRecorder recorder;
+    [SerializeField] private CanvasManager canvasManager;
     [SerializeField] private GameObject handObject;
     [SerializeField] private float proximityThreshold = 0.1f;
     [SerializeField] private float pointDistance = 0.5f; // Distance to determine end of first letter
@@ -30,9 +30,9 @@ public class LetterTracingSystem : MonoBehaviour
 
     private void Start()
     {
-        if (recorder == null)
+        if (canvasManager == null)
         {
-            recorder = GetComponent<SimpleRecorder>();
+            canvasManager = GetComponent<CanvasManager>();
         }
         
         CurrentState = TracingState.Idle;
@@ -48,21 +48,21 @@ public class LetterTracingSystem : MonoBehaviour
 
     private void CheckKeyframeProximity()
     {
-        if (currentKeyframeIndex >= recorder.currentRecord.frames.Count || 
+        if (currentKeyframeIndex >= canvasManager.activeSpheres.Count || 
             (firstLetter && currentKeyframeIndex > lastLetterKeyframeIndex))
         {
             return;
         }
 
-        Vector3 currentKeyframePosition = recorder.currentRecord.frames[currentKeyframeIndex].position;
+        Vector3 currentKeyframePosition = canvasManager.activeSpheres[currentKeyframeIndex].transform.position;
         
         if (Vector3.Distance(handObject.transform.position, currentKeyframePosition) < proximityThreshold)
         {
             OnKeyframeReached?.Invoke();
             currentKeyframeIndex++;
-            Debug.Log("hit a point");
+            Debug.Log("Hit a point");
 
-            if (currentKeyframeIndex >= recorder.currentRecord.frames.Count || 
+            if (currentKeyframeIndex >= canvasManager.activeSpheres.Count || 
                 (firstLetter && currentKeyframeIndex > lastLetterKeyframeIndex))
             {
                 CurrentState = TracingState.Completed;
@@ -73,9 +73,9 @@ public class LetterTracingSystem : MonoBehaviour
 
     public void StartTracing()
     {
-        if (recorder.currentRecord.frames.Count == 0)
+        if (canvasManager.activeSpheres.Count == 0)
         {
-            Debug.LogWarning("No keyframes to trace. Make sure to record some frames first.");
+            Debug.LogWarning("No spheres to trace. Make sure to create some spheres first.");
             return;
         }
 
@@ -88,7 +88,7 @@ public class LetterTracingSystem : MonoBehaviour
         }
         else
         {
-            lastLetterKeyframeIndex = recorder.currentRecord.frames.Count - 1;
+            lastLetterKeyframeIndex = canvasManager.activeSpheres.Count - 1;
         }
 
         OnTraceStarted?.Invoke();
@@ -97,20 +97,20 @@ public class LetterTracingSystem : MonoBehaviour
     private void DetermineLastLetterKeyframe()
     {
         lastLetterKeyframeIndex = 0;
-        for (int i = 0; i < recorder.currentRecord.frames.Count - 1; i++)
+        for (int i = 0; i < canvasManager.activeSpheres.Count - 1; i++)
         {
-            if (Vector3.Distance(recorder.currentRecord.frames[i].position, 
-                                 recorder.currentRecord.frames[i + 1].position) > pointDistance)
+            if (Vector3.Distance(canvasManager.activeSpheres[i].transform.position, 
+                                 canvasManager.activeSpheres[i + 1].transform.position) > pointDistance)
             {
                 lastLetterKeyframeIndex = i;
                 break;
             }
         }
         
-        // If no break is found, set to the last frame
+        // If no break is found, set to the last sphere
         if (lastLetterKeyframeIndex == 0)
         {
-            lastLetterKeyframeIndex = recorder.currentRecord.frames.Count - 1;
+            lastLetterKeyframeIndex = canvasManager.activeSpheres.Count - 1;
         }
 
         Debug.Log($"Last keyframe of first letter: {lastLetterKeyframeIndex}");

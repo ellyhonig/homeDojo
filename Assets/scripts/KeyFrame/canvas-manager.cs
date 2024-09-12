@@ -28,7 +28,7 @@ public class CanvasManager : MonoBehaviour
     private GameObject visualizationParent;
     private GameObject canvasParent;
     public float pointDistance = 0.1f;   
-    public float distanceFromHMD = 2f;
+    public float distanceFromHMD = .5f;
     public Vector3 offsetFromHMD = new Vector3(0f, -0.2f, 0f);
     public float additionalRotationAngle = 116; // Adjust this value to rotate more or less
 
@@ -56,6 +56,7 @@ public class CanvasManager : MonoBehaviour
             recorder.OnRecordingStopped += StopProcessing;
             recorder.OnRecordingStopped += currentRecordProcessor; // Subscribe to the event
             recorder.OnRecordingLoaded += CreateVisualizationForAllPoints;
+            recorder.OnRecordingLoaded += UpdateCanvas;
         }
         else
         {

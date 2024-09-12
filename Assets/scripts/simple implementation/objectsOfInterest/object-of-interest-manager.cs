@@ -6,7 +6,6 @@ public class ObjectOfInterestManager : MonoBehaviour
 {
     public enum ObjectState
     {
-        Opaque,
         Locked,
         Held,
         Thrown,
@@ -26,6 +25,9 @@ public class ObjectOfInterestManager : MonoBehaviour
     public float sphereEjectionForce = 5f;
     public float sphereEjectionOffset = 0.2f;
     public float containerProximityThreshold = 0.5f;
+    public float initialSpinForce = 2f;
+    public float positionSpringForce = 1000f;
+    public float positionSpringDamper = 10f;
 
     public event Action<ObjectState> OnStateChanged;
     public event Action OnHMDProximity;
@@ -35,7 +37,7 @@ public class ObjectOfInterestManager : MonoBehaviour
     private CanvasManager canvasManager;
     private SimpleRecorder recorder;
     private Vector3 initialPosition;
-    private ObjectState currentState = ObjectState.Opaque;
+    private ObjectState currentState = ObjectState.Locked;
     private Rigidbody rb;
     private Vector3 handVelocity;
     private Vector3 lastHandPosition;
@@ -73,16 +75,9 @@ public class ObjectOfInterestManager : MonoBehaviour
         }
 
         SetInitialPosition();
-        SetState(ObjectState.Opaque);
-    }
-
-
-    private void CreateDefaultContainerObject()
-    {
-        containerObject = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        containerObject.transform.localScale = Vector3.one;
-        containerObject.name = "ContainerObject";
-        containerObject.transform.position = recorder.playerToRecord.hmd.transform.position + Vector3.forward; // Set a default position
+        AddRigidbody();
+        SetState(ObjectState.Locked);
+        ApplyInitialSpin();
     }
 
     private void CreateDefaultObject()
@@ -100,6 +95,14 @@ public class ObjectOfInterestManager : MonoBehaviour
         spherePrefab.SetActive(false);
     }
 
+    private void CreateDefaultContainerObject()
+    {
+        containerObject = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        containerObject.transform.localScale = Vector3.one;
+        containerObject.name = "ContainerObject";
+        containerObject.transform.position = recorder.playerToRecord.hmd.transform.position + Vector3.forward;
+    }
+
     private void SetInitialPosition()
     {
         if (canvasManager == null)
@@ -113,7 +116,7 @@ public class ObjectOfInterestManager : MonoBehaviour
         if (spheres != null && spheres.Count > 0)
         {
             int lastIndex = Mathf.Min(letterTracingSystem.lastLetterKeyframeIndex, spheres.Count - 1);
-            GameObject lastSphere = spheres[spheres.Count  -1];
+            GameObject lastSphere = spheres[lastIndex];
             if (lastSphere != null)
             {
                 Vector3 lastPosition = lastSphere.transform.position;
@@ -138,11 +141,24 @@ public class ObjectOfInterestManager : MonoBehaviour
         initialPosition = objectOfInterest.transform.position;
     }
 
-    
-    // Method to be called when spheres are updated
-    
+    private void AddRigidbody()
+    {
+        if (rb == null)
+            rb = objectOfInterest.AddComponent<Rigidbody>();
+        rb.useGravity = false;
+        rb.isKinematic = false;
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        rb.drag = 0.5f;
+        rb.angularDrag = 0.5f;
+    }
 
-   private void SetState(ObjectState newState)
+    private void ApplyInitialSpin()
+    {
+        Vector3 randomAxis = UnityEngine.Random.onUnitSphere;
+        rb.AddTorque(randomAxis * initialSpinForce, ForceMode.VelocityChange);
+    }
+
+    private void SetState(ObjectState newState)
     {
         if (currentState != newState)
         {
@@ -151,67 +167,85 @@ public class ObjectOfInterestManager : MonoBehaviour
 
             switch (currentState)
             {
-                case ObjectState.Opaque:
-                    SetOpacity(1f);
-                    RemoveRigidbody();
-                    break;
                 case ObjectState.Locked:
-                    SetOpacity(0.5f);
-                    AddLockedRigidbody();
+                    SetLocked();
                     break;
                 case ObjectState.Held:
-                    SetOpacity(1f);
-                    if (rb != null) rb.isKinematic = true;
+                    SetHeld();
                     break;
                 case ObjectState.Thrown:
-                    SetOpacity(1f);
-                    if (rb != null)
-                    {
-                        rb.isKinematic = false;
-                        rb.velocity = handVelocity;
-                    }
-                    StartCoroutine(ResetAfterDelay());
+                    SetThrown();
                     break;
                 case ObjectState.Collected:
-                    // The object is already set to inactive in CollectObject method
+                    SetCollected();
                     break;
             }
         }
     }
-    private void SetOpacity(float opacity)
-    {
-        Renderer renderer = objectOfInterest.GetComponent<Renderer>();
-        if (renderer != null && renderer.material != null)
-        {
-            Color color = renderer.material.color;
-            color.a = opacity;
-            renderer.material.color = color;
-        }
-    }
 
-    private void AddLockedRigidbody()
+    private void SetLocked()
     {
-        if (rb == null)
-            rb = objectOfInterest.AddComponent<Rigidbody>();
-        rb.isKinematic = true;
         rb.useGravity = false;
+        rb.constraints = RigidbodyConstraints.None;
     }
 
-    private void RemoveRigidbody()
+    private void SetHeld()
     {
-        if (rb != null)
+        rb.useGravity = false;
+        rb.constraints = RigidbodyConstraints.None;
+    }
+
+    private void SetThrown()
+    {
+        rb.useGravity = true;
+        rb.constraints = RigidbodyConstraints.None;
+        rb.velocity = handVelocity;
+        StartCoroutine(ResetAfterDelay());
+    }
+
+    private void SetCollected()
+    {
+        rb.useGravity = false;
+        rb.constraints = RigidbodyConstraints.None;
+        objectOfInterest.transform.position = containerObject.transform.position;
+        objectOfInterest.transform.SetParent(containerObject.transform);
+    }
+
+    private void FixedUpdate()
+    {
+        if (currentState == ObjectState.Locked)
         {
-            Destroy(rb);
-            rb = null;
+            Vector3 positionError = initialPosition - rb.position;
+            Vector3 velocityError = -rb.velocity;
+            rb.AddForce(positionError * positionSpringForce + velocityError * positionSpringDamper);
+        }
+        else if (currentState == ObjectState.Held)
+        {
+            UpdateHandPosition();
+            UpdateHandVelocity();
         }
     }
 
-    private void OnTraceCompleted()
+    private void UpdateHandPosition()
     {
-        SetState(ObjectState.Locked);
+        Vector3 rightHandPos = recorder.playerToRecord.righthand.transform.position;
+        Vector3 leftHandPos = recorder.playerToRecord.lefthand.transform.position;
+        Vector3 closestHand = Vector3.Distance(objectOfInterest.transform.position, rightHandPos) <= Vector3.Distance(objectOfInterest.transform.position, leftHandPos) ? rightHandPos : leftHandPos;
+
+        rb.MovePosition(closestHand);
     }
 
-     private void Update()
+    private void UpdateHandVelocity()
+    {
+        Vector3 rightHandPos = recorder.playerToRecord.righthand.transform.position;
+        Vector3 leftHandPos = recorder.playerToRecord.lefthand.transform.position;
+        Vector3 closestHand = Vector3.Distance(objectOfInterest.transform.position, rightHandPos) <= Vector3.Distance(objectOfInterest.transform.position, leftHandPos) ? rightHandPos : leftHandPos;
+
+        handVelocity = (closestHand - lastHandPosition) / Time.fixedDeltaTime;
+        lastHandPosition = closestHand;
+    }
+
+    private void Update()
     {
         switch (currentState)
         {
@@ -219,7 +253,6 @@ public class ObjectOfInterestManager : MonoBehaviour
                 CheckProximity();
                 break;
             case ObjectState.Held:
-                UpdateHandVelocity();
                 CheckThrow();
                 CheckContainerProximity();
                 break;
@@ -228,20 +261,6 @@ public class ObjectOfInterestManager : MonoBehaviour
         CheckHMDProximity();
     }
 
-    private void CheckContainerProximity()
-    {
-        if (Vector3.Distance(objectOfInterest.transform.position, containerObject.transform.position) <= containerProximityThreshold)
-        {
-            CollectObject();
-        }
-    }
-
-    private void CollectObject()
-    {
-        SetState(ObjectState.Collected);
-        OnObjectCollected?.Invoke();
-        ResetToInitialPosition();   
-    }
     private void CheckProximity()
     {
         Vector3 rightHandPos = recorder.playerToRecord.righthand.transform.position;
@@ -253,18 +272,6 @@ public class ObjectOfInterestManager : MonoBehaviour
             SetState(ObjectState.Held);
             lastHandPosition = Vector3.Distance(objectOfInterest.transform.position, rightHandPos) <= proximityThreshold ? rightHandPos : leftHandPos;
         }
-    }
-
-    private void UpdateHandVelocity()
-    {
-        Vector3 rightHandPos = recorder.playerToRecord.righthand.transform.position;
-        Vector3 leftHandPos = recorder.playerToRecord.lefthand.transform.position;
-        Vector3 closestHand = Vector3.Distance(objectOfInterest.transform.position, rightHandPos) <= Vector3.Distance(objectOfInterest.transform.position, leftHandPos) ? rightHandPos : leftHandPos;
-
-        handVelocity = (closestHand - lastHandPosition) / Time.deltaTime;
-        lastHandPosition = closestHand;
-
-        objectOfInterest.transform.position = closestHand;
     }
 
     private void CheckThrow()
@@ -284,6 +291,20 @@ public class ObjectOfInterestManager : MonoBehaviour
         }
     }
 
+    private void CheckContainerProximity()
+    {
+        if (Vector3.Distance(objectOfInterest.transform.position, containerObject.transform.position) <= containerProximityThreshold)
+        {
+            CollectObject();
+        }
+    }
+
+    private void CollectObject()
+    {
+        SetState(ObjectState.Collected);
+        OnObjectCollected?.Invoke();
+    }
+
     private void CheckHMDProximity()
     {
         Vector3 hmdPosition = recorder.playerToRecord.hmd.transform.position;
@@ -298,15 +319,16 @@ public class ObjectOfInterestManager : MonoBehaviour
     private void ResetToInitialPosition()
     {
         objectOfInterest.transform.position = initialPosition;
+        objectOfInterest.transform.SetParent(null);
         SetState(ObjectState.Locked);
     }
+
     private void EjectSpheres()
     {
         Vector3 hmdForward = recorder.playerToRecord.hmd.transform.forward;
         Vector3 hmdPosition = recorder.playerToRecord.hmd.transform.position;
         Vector3 hmdUp = recorder.playerToRecord.hmd.transform.up;
 
-        // Calculate the ejection start position
         Vector3 ejectionStartPosition = hmdPosition + hmdForward * 0.2f - hmdUp * sphereEjectionOffset;
 
         for (int i = 0; i < sphereCount; i++)
@@ -316,10 +338,9 @@ public class ObjectOfInterestManager : MonoBehaviour
 
             Rigidbody sphereRb = sphere.AddComponent<Rigidbody>();
             
-            // Calculate ejection direction with a downward angle
             Vector3 ejectionDirection = Quaternion.Euler(
-                UnityEngine.Random.Range(-15f, -45f), // Downward angle
-                UnityEngine.Random.Range(-30f, 30f),  // Horizontal spread
+                UnityEngine.Random.Range(-15f, -45f),
+                UnityEngine.Random.Range(-30f, 30f),
                 0
             ) * hmdForward;
 
@@ -338,7 +359,11 @@ public class ObjectOfInterestManager : MonoBehaviour
     private IEnumerator ResetAfterDelay()
     {
         yield return new WaitForSeconds(resetDelay);
-        objectOfInterest.transform.position = initialPosition;
+        ResetToInitialPosition();
+    }
+
+    private void OnTraceCompleted()
+    {
         SetState(ObjectState.Locked);
     }
 

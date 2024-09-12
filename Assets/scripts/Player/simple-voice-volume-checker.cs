@@ -13,6 +13,7 @@ public class SimpleMicVolumeChecker : MonoBehaviour
     private string selectedMicrophone;
     private bool isListening = false;
     private float timer = 0f;
+    public  float volumeLevel;
 
     private void Start()
     {
@@ -36,7 +37,7 @@ public class SimpleMicVolumeChecker : MonoBehaviour
 
         while (isListening)
         {
-            float volumeLevel = GetAverageVolume();
+             volumeLevel = GetAverageVolume();
 
             if (volumeLevel > volumeThreshold)
             {

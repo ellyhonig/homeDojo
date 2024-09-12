@@ -1,17 +1,19 @@
 using UnityEngine;
 using System;
 using System.IO;
+using System.Collections.Generic;
+using Newtonsoft.Json;
 
 public class LevelManager : MonoBehaviour
 {
     public enum GameMode
     {
-        VolumeChecking,
+        PhonemeChecking,
         TraceChecking,
         ObjectPlacing
     }
 
-    public GameMode currentMode { get; set; }
+    public GameMode currentMode { get; private set; }
 
     private int _currentLevel;
     public int currentLevel
@@ -22,6 +24,8 @@ public class LevelManager : MonoBehaviour
             if (LevelExists(value))
             {
                 _currentLevel = value;
+                currentSound = levelPlan[value].Phoneme;
+                Debug.Log($"Current Level: {_currentLevel}, Letter: {levelPlan[value].Letter}, Phoneme: {currentSound}");
             }
             else
             {
@@ -29,6 +33,9 @@ public class LevelManager : MonoBehaviour
             }
         }
     }
+
+    public string currentSound { get; private set; } = "CUH";
+
     public void SetLevel(int level)
     {
         if (LevelExists(level))
@@ -41,48 +48,67 @@ public class LevelManager : MonoBehaviour
             Debug.LogWarning($"Attempted to set level to {level}, but it does not exist.");
         }
     }
-    public event Action OnVolumeCheckStart;
+    
+    public event Action OnPhonemeCheckStart;
 
     [SerializeField] private SimpleRecorder recorder;
     [SerializeField] private LetterTracingSystem tracingSystem;
     [SerializeField] private ObjectOfInterestManager objectManager;
-    [SerializeField] private SimpleMicVolumeChecker volumeChecker;
+    [SerializeField] private PocketSphinxPhonemeRecognition phonemeRecognizer;
     private SaveManager saveManager;
+
+    private List<LevelData> levelPlan = new List<LevelData>();
 
     private void Start()
     {
         if (recorder == null) recorder = GetComponent<SimpleRecorder>();
         if (tracingSystem == null) tracingSystem = GetComponent<LetterTracingSystem>();
         if (objectManager == null) objectManager = GetComponent<ObjectOfInterestManager>();
-        if (volumeChecker == null) volumeChecker = GetComponent<SimpleMicVolumeChecker>();
+        if (phonemeRecognizer == null) phonemeRecognizer = GetComponent<PocketSphinxPhonemeRecognition>();
         saveManager = GetComponent<SaveManager>();
-        volumeChecker.onVoiceDetected.AddListener(OnVoiceDetected);
+        phonemeRecognizer.OnPhonemeDetected += OnPhonemeDetected;
         tracingSystem.OnTraceCompleted += OnTraceCompleted;
         objectManager.OnObjectCollected += OnObjectCollected;
 
+        LoadLevelPlan();
         //Restart();
+    }
+
+    private void LoadLevelPlan()
+    {
+        string filePath = Path.Combine(Application.streamingAssetsPath, "LevelPlan.json");
+        if (File.Exists(filePath))
+        {
+            string jsonContent = File.ReadAllText(filePath);
+            levelPlan = JsonConvert.DeserializeObject<List<LevelData>>(jsonContent);
+        }
+        else
+        {
+            Debug.LogError("LevelPlan.json not found!");
+        }
     }
 
     public void Restart()
     {
         currentLevel = 0;
         LoadLevel(currentLevel);
-        SetGameMode(GameMode.VolumeChecking);
+        SetGameMode(GameMode.PhonemeChecking);
     }
+
     private bool LevelExists(int level)
     {
-        string filePath = Path.Combine(Application.persistentDataPath, $"simple_recording{level}.json");
-        return File.Exists(filePath);
+        return level >= 0 && level < levelPlan.Count;
     }
+
     private void SetGameMode(GameMode newMode)
     {
         currentMode = newMode;
         UpdateComponentStates();
 
-        if (currentMode == GameMode.VolumeChecking)
+        if (currentMode == GameMode.PhonemeChecking)
         {
-            OnVolumeCheckStart?.Invoke();
-            StartCoroutine(volumeChecker.MicrophoneCheck());
+            OnPhonemeCheckStart?.Invoke();
+            phonemeRecognizer.StartPhonemeRecognition();
         }
     }
 
@@ -91,30 +117,30 @@ public class LevelManager : MonoBehaviour
         if (LevelExists(level))
         {
             currentLevel = level;
+            currentSound = levelPlan[level].Phoneme;
             recorder.LoadRecording(currentLevel);
         }
         else
         {
             Debug.LogWarning($"Attempted to set level to {level}, but it does not exist.");
         }
-        
     }
 
     private void UpdateComponentStates()
     {
-        volumeChecker.enabled = (currentMode == GameMode.VolumeChecking);
+        phonemeRecognizer.enabled = (currentMode == GameMode.PhonemeChecking);
         tracingSystem.enabled = (currentMode == GameMode.TraceChecking);
         objectManager.enabled = (currentMode == GameMode.ObjectPlacing);
     }
 
-    private void OnVoiceDetected()
+    private void OnPhonemeDetected(string detectedPhoneme)
     {
-        if (currentMode == GameMode.VolumeChecking)
+        Debug.Log($"Phoneme detected: {detectedPhoneme}");
+        if (currentMode == GameMode.PhonemeChecking && detectedPhoneme == currentSound)
         {
             SetGameMode(GameMode.TraceChecking);
             tracingSystem.StartTracing();
-            Debug.Log("voice complete");
-
+            Debug.Log("Correct phoneme detected, starting tracing");
         }
     }
 
@@ -132,14 +158,21 @@ public class LevelManager : MonoBehaviour
         {
             currentLevel++;
             LoadLevel(currentLevel);
-            SetGameMode(GameMode.VolumeChecking);
+            SetGameMode(GameMode.PhonemeChecking);
         }
     }
 
     private void OnDestroy()
     {
-        if (volumeChecker != null) volumeChecker.onVoiceDetected.RemoveListener(OnVoiceDetected);
+        if (phonemeRecognizer != null) phonemeRecognizer.OnPhonemeDetected -= OnPhonemeDetected;
         if (tracingSystem != null) tracingSystem.OnTraceCompleted -= OnTraceCompleted;
         if (objectManager != null) objectManager.OnObjectCollected -= OnObjectCollected;
     }
+}
+
+[System.Serializable]
+public class LevelData
+{
+    public string Letter;
+    public string Phoneme;
 }

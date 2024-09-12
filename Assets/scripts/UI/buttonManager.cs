@@ -131,7 +131,7 @@ public class ButtonManager : MonoBehaviour
            canvasManager.UpdateCanvas();  
            if(hideDevButtons)
            {
-                if(!loaded){recorder.LoadRecording(); loaded = true;tracingSystem.StartTracing();  }
+                if(!loaded){loaded = true; levelManager.Restart();}
                   
            }
            else{

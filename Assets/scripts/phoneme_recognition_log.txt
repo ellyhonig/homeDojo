@@ -1,0 +1,46 @@
+Python script started
+Custom dictionary created
+Custom language model created
+PocketSphinx initialized
+PyAudio stream opened
+Starting phoneme recognition
+Recognized: BUH
+Confidence: 0.7311
+Frames: 290
+---
+Recognized: CUH
+Confidence: 0.7311
+Frames: 297
+---
+Recognized: CUH
+Confidence: 0.7311
+Frames: 988
+---
+Recognized: AH
+Confidence: 0.7311
+Frames: 1148
+---
+Recognized: CUH
+Confidence: 0.7311
+Frames: 1084
+---
+Recognized: BUH
+Confidence: 0.7311
+Frames: 201
+---
+Recognized: BUH
+Confidence: 0.7311
+Frames: 1065
+---
+Recognized: CUH
+Confidence: 0.7311
+Frames: 502
+---
+Recognized: BUH
+Confidence: 0.7311
+Frames: 284
+---
+Recognized: CUH
+Confidence: 0.7311
+Frames: 514
+---

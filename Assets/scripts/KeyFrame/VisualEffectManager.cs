@@ -26,6 +26,7 @@ public class VisualEffectManager : MonoBehaviour
         tracingSystem.OnTraceStarted += InitializeVisuals;
         tracingSystem.OnKeyframeReached += UpdateVisuals;
         tracingSystem.OnTraceCompleted += FinalizeVisuals;
+        recorder.OnRecordingLoaded += ClearLines;
     }
 
     private void InitializeVisuals()

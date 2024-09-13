@@ -10,10 +10,18 @@ public class LevelManager : MonoBehaviour
     {
         PhonemeChecking,
         TraceChecking,
-        ObjectPlacing
+        ObjectPlacing,
+        Dictation
+    }
+
+    public enum GamePhase
+    {
+        Trace,
+        Dictate
     }
 
     public GameMode currentMode { get; private set; }
+    public GamePhase currentPhase { get; private set; }
 
     private int _currentLevel;
     public int currentLevel
@@ -50,11 +58,14 @@ public class LevelManager : MonoBehaviour
     }
     
     public event Action OnPhonemeCheckStart;
+    public event Action OnDictationStart;
+    public event Action OnAllLevelsCompleted;
 
     [SerializeField] private SimpleRecorder recorder;
     [SerializeField] private LetterTracingSystem tracingSystem;
     [SerializeField] private ObjectOfInterestManager objectManager;
     [SerializeField] private PocketSphinxPhonemeRecognition phonemeRecognizer;
+    [SerializeField] private CanvasManager canvasManager;
     private SaveManager saveManager;
 
     private List<LevelData> levelPlan = new List<LevelData>();
@@ -65,13 +76,15 @@ public class LevelManager : MonoBehaviour
         if (tracingSystem == null) tracingSystem = GetComponent<LetterTracingSystem>();
         if (objectManager == null) objectManager = GetComponent<ObjectOfInterestManager>();
         if (phonemeRecognizer == null) phonemeRecognizer = GetComponent<PocketSphinxPhonemeRecognition>();
+        if (canvasManager == null) canvasManager = GetComponent<CanvasManager>();
         saveManager = GetComponent<SaveManager>();
         phonemeRecognizer.OnPhonemeDetected += OnPhonemeDetected;
         tracingSystem.OnTraceCompleted += OnTraceCompleted;
         objectManager.OnObjectCollected += OnObjectCollected;
+        canvasManager.OnDictationComplete += OnDictationCompleted;
 
         LoadLevelPlan();
-        //Restart();
+        Restart();
     }
 
     private void LoadLevelPlan()
@@ -91,6 +104,7 @@ public class LevelManager : MonoBehaviour
     public void Restart()
     {
         currentLevel = 0;
+        currentPhase = GamePhase.Trace;
         LoadLevel(currentLevel);
         SetGameMode(GameMode.PhonemeChecking);
     }
@@ -109,6 +123,11 @@ public class LevelManager : MonoBehaviour
         {
             OnPhonemeCheckStart?.Invoke();
             phonemeRecognizer.StartPhonemeRecognition();
+        }
+        else if (currentMode == GameMode.Dictation)
+        {
+            OnDictationStart?.Invoke();
+            canvasManager.StartDictation();
         }
     }
 
@@ -129,8 +148,9 @@ public class LevelManager : MonoBehaviour
     private void UpdateComponentStates()
     {
         phonemeRecognizer.enabled = (currentMode == GameMode.PhonemeChecking);
-        tracingSystem.enabled = (currentMode == GameMode.TraceChecking);
-        objectManager.enabled = (currentMode == GameMode.ObjectPlacing);
+        //tracingSystem.enabled = (currentMode == GameMode.TraceChecking);
+        //objectManager.enabled = (currentMode == GameMode.ObjectPlacing);
+       // canvasManager.enabled = (currentMode == GameMode.Dictation);
     }
 
     private void OnPhonemeDetected(string detectedPhoneme)
@@ -152,13 +172,53 @@ public class LevelManager : MonoBehaviour
         }
     }
 
+    private void OnDictationCompleted()
+    {
+        if (currentMode == GameMode.Dictation)
+        {
+            SetGameMode(GameMode.ObjectPlacing);
+        }
+    }
+
     private void OnObjectCollected()
     {
         if (currentMode == GameMode.ObjectPlacing)
         {
             currentLevel++;
-            LoadLevel(currentLevel);
-            SetGameMode(GameMode.PhonemeChecking);
+            
+            if (currentLevel >= levelPlan.Count)
+            {
+                if (currentPhase == GamePhase.Trace)
+                {
+                    // All levels completed in Trace phase, move to Dictate phase
+                    currentPhase = GamePhase.Dictate;
+                    currentLevel = 0;
+                    LoadLevel(currentLevel);
+                    SetGameMode(GameMode.Dictation);
+                    Debug.Log("All levels completed in Trace phase. Moving to Dictate phase.");
+                }
+                else
+                {
+                    // All levels completed in both phases
+                    OnAllLevelsCompleted?.Invoke();
+                    Debug.Log("All levels completed in both phases. Game finished!");
+                    // You can add any game completion logic here
+                    return;
+                }
+            }
+            else
+            {
+                LoadLevel(currentLevel);
+                
+                if (currentPhase == GamePhase.Trace)
+                {
+                    SetGameMode(GameMode.PhonemeChecking);
+                }
+                else
+                {
+                    SetGameMode(GameMode.Dictation);
+                }
+            }
         }
     }
 
@@ -167,6 +227,7 @@ public class LevelManager : MonoBehaviour
         if (phonemeRecognizer != null) phonemeRecognizer.OnPhonemeDetected -= OnPhonemeDetected;
         if (tracingSystem != null) tracingSystem.OnTraceCompleted -= OnTraceCompleted;
         if (objectManager != null) objectManager.OnObjectCollected -= OnObjectCollected;
+        if (canvasManager != null) canvasManager.OnDictationComplete -= OnDictationCompleted;
     }
 }
 

@@ -7,6 +7,7 @@ public class ObjectOfInterestManager : MonoBehaviour
     public enum ObjectState
     {
         Locked,
+        Unlocked,
         Held,
         Thrown,
         Collected
@@ -55,7 +56,7 @@ public class ObjectOfInterestManager : MonoBehaviour
             return;
         }
 
-        letterTracingSystem.OnTraceCompleted += OnTraceCompleted;
+        letterTracingSystem.OnTraceCompleted += UnlockObject;
         recorder.OnRecordingLoaded += SetInitialPosition;
         canvasManager.OnCanvasRepositioned += SetInitialPosition;
 
@@ -78,9 +79,11 @@ public class ObjectOfInterestManager : MonoBehaviour
         AddRigidbody();
         SetState(ObjectState.Locked);
         ApplyInitialSpin();
+        letterTracingSystem.OnTraceCompleted += UnlockObject;
+        recorder.OnRecordingLoaded += OnRecordingLoaded;
+        canvasManager.OnCanvasRepositioned += SetInitialPosition;
     }
-
-    private void CreateDefaultObject()
+        private void CreateDefaultObject()
     {
         objectOfInterest = GameObject.CreatePrimitive(PrimitiveType.Cube);
         objectOfInterest.transform.localScale = Vector3.one * 0.1f;
@@ -157,11 +160,17 @@ public class ObjectOfInterestManager : MonoBehaviour
         Vector3 randomAxis = UnityEngine.Random.onUnitSphere;
         rb.AddTorque(randomAxis * initialSpinForce, ForceMode.VelocityChange);
     }
-
+    private void OnRecordingLoaded()
+    {
+        Debug.Log("Recording loaded. Resetting object state.");
+        SetInitialPosition();
+        SetState(ObjectState.Locked);
+    }
     private void SetState(ObjectState newState)
     {
         if (currentState != newState)
         {
+            Debug.Log($"State changing from {currentState} to {newState}");
             currentState = newState;
             OnStateChanged?.Invoke(currentState);
 
@@ -169,6 +178,9 @@ public class ObjectOfInterestManager : MonoBehaviour
             {
                 case ObjectState.Locked:
                     SetLocked();
+                    break;
+                case ObjectState.Unlocked:
+                    SetUnlocked();
                     break;
                 case ObjectState.Held:
                     SetHeld();
@@ -185,6 +197,13 @@ public class ObjectOfInterestManager : MonoBehaviour
 
     private void SetLocked()
     {
+        rb.isKinematic = true;
+        rb.constraints = RigidbodyConstraints.FreezeAll;
+    }
+
+    private void SetUnlocked()
+    {
+        rb.isKinematic = false;
         rb.useGravity = false;
         rb.constraints = RigidbodyConstraints.None;
     }
@@ -213,7 +232,7 @@ public class ObjectOfInterestManager : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (currentState == ObjectState.Locked)
+        if (currentState == ObjectState.Unlocked)
         {
             Vector3 positionError = initialPosition - rb.position;
             Vector3 velocityError = -rb.velocity;
@@ -249,7 +268,7 @@ public class ObjectOfInterestManager : MonoBehaviour
     {
         switch (currentState)
         {
-            case ObjectState.Locked:
+            case ObjectState.Unlocked:
                 CheckProximity();
                 break;
             case ObjectState.Held:
@@ -263,6 +282,8 @@ public class ObjectOfInterestManager : MonoBehaviour
 
     private void CheckProximity()
     {
+        if (currentState != ObjectState.Unlocked) return;
+
         Vector3 rightHandPos = recorder.playerToRecord.righthand.transform.position;
         Vector3 leftHandPos = recorder.playerToRecord.lefthand.transform.position;
 
@@ -313,6 +334,7 @@ public class ObjectOfInterestManager : MonoBehaviour
             OnHMDProximity?.Invoke();
             EjectSpheres();
             ResetToInitialPosition();
+            CollectObject();
         }
     }
 
@@ -320,7 +342,7 @@ public class ObjectOfInterestManager : MonoBehaviour
     {
         objectOfInterest.transform.position = initialPosition;
         objectOfInterest.transform.SetParent(null);
-        SetState(ObjectState.Locked);
+        SetState(ObjectState.Unlocked);
     }
 
     private void EjectSpheres()
@@ -362,20 +384,27 @@ public class ObjectOfInterestManager : MonoBehaviour
         ResetToInitialPosition();
     }
 
-    private void OnTraceCompleted()
+    private void UnlockObject()
     {
-        SetState(ObjectState.Locked);
+        if (currentState == ObjectState.Locked)
+        {
+            SetState(ObjectState.Unlocked);
+        }
     }
 
     private void OnDestroy()
     {
         if (letterTracingSystem != null)
         {
-            letterTracingSystem.OnTraceCompleted -= OnTraceCompleted;
+            letterTracingSystem.OnTraceCompleted -= UnlockObject;
         }
         if (recorder != null)
         {
-            recorder.OnRecordingLoaded -= SetInitialPosition;
+            recorder.OnRecordingLoaded -= OnRecordingLoaded;
+        }
+        if (canvasManager != null)
+        {
+            canvasManager.OnCanvasRepositioned -= SetInitialPosition;
         }
     }
 }

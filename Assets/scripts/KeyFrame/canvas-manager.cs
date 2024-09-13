@@ -1,6 +1,8 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System;
+using System.Collections;
+using System.Linq;
 
 
 public class CanvasManager : MonoBehaviour
@@ -16,6 +18,7 @@ public class CanvasManager : MonoBehaviour
     [SerializeField] private Color sphereColor = Color.red;
     [SerializeField, Range(0, 31)] private int visualizationLayer = 0;
     [SerializeField] private int initialPoolSize = 2000;
+    [SerializeField] private GameObject spherePrefab; // Add this field
 
     private Queue<GameObject> spherePool = new Queue<GameObject>();
     public List<GameObject> activeSpheres = new List<GameObject>();
@@ -31,9 +34,15 @@ public class CanvasManager : MonoBehaviour
     public float distanceFromHMD = .5f;
     public Vector3 offsetFromHMD = new Vector3(0f, -0.2f, 0f);
     public float additionalRotationAngle = 116; // Adjust this value to rotate more or less
-
+    public GameObject dictationCanvas;
+    private List<GameObject> dictSpheres = new List<GameObject>();
+    public float dictationDistance = 0.1f;
+    public float dictationSpacing = 0.05f;
     public event Action OnCanvasRepositioned;
-
+     public event Action OnDictationStart;
+    public event Action OnDictationComplete;
+    public delegate void UpdateDelegate();
+    public UpdateDelegate currentUpdate;
      private void Start()
     {
         Initialize();
@@ -152,6 +161,27 @@ public class CanvasManager : MonoBehaviour
         sphere.transform.SetParent(visualizationParent.transform);
         return sphere;
     }
+    private GameObject CreateColoredSphere(Vector3 position, Color color)
+    {
+        // Create the sphere as a child of the canvas
+        GameObject sphere = Instantiate(spherePrefab, position, Quaternion.identity, canvasPlane.transform);
+        
+        // Convert the world position to a local position relative to the canvas
+        sphere.transform.localPosition = canvasPlane.transform.InverseTransformPoint(position);
+        
+        sphere.transform.localScale = Vector3.one * (sphereRadius * 2);
+        Renderer renderer = sphere.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            renderer.material.color = color;
+        }
+        else
+        {
+            Debug.LogWarning("Sphere prefab does not have a Renderer component.");
+        }
+        return sphere;
+    }
+
     private float updateRate = 0.01f; // Run 100x per second
     private float nextUpdateTime = 0f;
 
@@ -159,7 +189,7 @@ public class CanvasManager : MonoBehaviour
     {
         if (Time.time >= nextUpdateTime)
         {
-            
+            currentUpdate?.Invoke();
             if (!isInitialized || !isRecording) return;
 
             UpdateHmdSide();
@@ -170,7 +200,88 @@ public class CanvasManager : MonoBehaviour
         }
          
     }
+    private IEnumerator RemoveSphereAfterDelay(GameObject sphere, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        dictSpheres.Remove(sphere);
+        Destroy(sphere);
+    }
+public void StartDictation()
+    {
+        if (recorder.currentRecord == null || recorder.currentRecord.frames.Count == 0)
+        {
+            Debug.LogWarning("No current record available for dictation.");
+            return;
+        }
 
+        ClearDictationSpheres();
+
+        // Create initial spheres for the record points
+        foreach (var frame in recorder.currentRecord.frames)
+        {
+            GameObject sphere = CreateColoredSphere(frame.position, Color.red);
+            sphere.transform.SetParent(canvasPlane.transform, true);
+            sphere.SetActive(false);  // Hide the sphere initially
+            dictSpheres.Add(sphere);
+        }
+
+        if (dictationCanvas != null)
+        {
+            dictationCanvas.SetActive(true);
+        }
+
+        OnDictationStart?.Invoke();
+        currentUpdate = DictationUpdate;
+    }
+
+    private void DictationUpdate()
+    {
+        ConstrainedHandUpdate();
+        Vector3 handPosition = recorder.playerToRecord.righthand.transform.position;
+
+        if (dictSpheres.Count == 0 || Vector3.Distance(handPosition, dictSpheres[dictSpheres.Count - 1].transform.position) >= dictationSpacing)
+        {
+            GameObject newSphere = CreateColoredSphere(handPosition, Color.red);
+            newSphere.transform.SetParent(canvasPlane.transform, true);
+            dictSpheres.Add(newSphere);
+
+            CheckSphereProximity(newSphere);
+            StartCoroutine(RemoveSphereAfterDelay(newSphere, 1.5f));
+        }
+
+        if (AllPointsMapped())
+        {
+            OnDictationComplete?.Invoke();
+            currentUpdate = null;
+        }
+    }
+
+    private void CheckSphereProximity(GameObject sphere)
+    {
+        for (int i = 0; i < recorder.currentRecord.frames.Count; i++)
+        {
+            if (Vector3.Distance(sphere.transform.position, recorder.currentRecord.frames[i].position) <= dictationDistance)
+            {
+                sphere.GetComponent<Renderer>().material.color = Color.green;
+                dictSpheres[i].SetActive(true);  // Show the corresponding record sphere
+                break;
+            }
+        }
+    }
+
+    private bool AllPointsMapped()
+    {
+        return dictSpheres.Take(recorder.currentRecord.frames.Count).All(sphere => sphere.activeSelf);
+    }
+
+    private void ClearDictationSpheres()
+    {
+        foreach (var sphere in dictSpheres)
+        {
+            Destroy(sphere);
+        }
+        dictSpheres.Clear();
+    }
     private void UpdateHmdSide()
     {
         hmdSide = canvasPlaneGeometry.GetSide(recorder.playerToRecord.hmd.transform.position) ? 1 : -1;

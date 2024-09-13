@@ -6,41 +6,65 @@ PyAudio stream opened
 Starting phoneme recognition
 Recognized: BUH
 Confidence: 0.7311
-Frames: 290
+Frames: 854
 ---
 Recognized: CUH
 Confidence: 0.7311
-Frames: 297
+Frames: 252
 ---
 Recognized: CUH
 Confidence: 0.7311
-Frames: 988
+Frames: 450
+---
+Recognized: CUH
+Confidence: 0.7311
+Frames: 342
+---
+Recognized: CUH CUH
+Confidence: 0.7311
+Frames: 879
 ---
 Recognized: AH
 Confidence: 0.7311
-Frames: 1148
----
-Recognized: CUH
-Confidence: 0.7311
-Frames: 1084
----
-Recognized: BUH
-Confidence: 0.7311
-Frames: 201
----
-Recognized: BUH
-Confidence: 0.7311
-Frames: 1065
----
-Recognized: CUH
-Confidence: 0.7311
-Frames: 502
+Frames: 489
 ---
 Recognized: BUH
 Confidence: 0.7311
 Frames: 284
 ---
+Recognized: BUH
+Confidence: 0.7311
+Frames: 265
+---
 Recognized: CUH
 Confidence: 0.7311
-Frames: 514
+Frames: 329
+---
+Recognized: CUH
+Confidence: 0.7311
+Frames: 943
+---
+Recognized: AH
+Confidence: 0.7311
+Frames: 252
+---
+Recognized: BUH
+Confidence: 0.7311
+Frames: 246
+---
+Recognized: AH
+Confidence: 0.7311
+Frames: 578
+---
+Recognized: CUH
+Confidence: 0.7311
+Frames: 246
+---
+Recognized: BUH
+Confidence: 0.7311
+Frames: 489
+---
+Recognized: CUH
+Confidence: 0.7311
+Frames: 559
 ---
